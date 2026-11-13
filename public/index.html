@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sales Billing Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a ledger desk. Slim top bar with the signed-in user, tab row, then one dense working table or form per view. */
+:root {
+  --bg: #f3f4f6;
+  --surface: #fcfcfb;
+  --ink: #14181f;
+  --ink-2: #4b5260;
+  --ink-3: #6f7685;
+  --line: #dcdfe5;
+  --line-soft: #e9ebef;
+  --accent: #1c5cab;
+  --accent-ink: #ffffff;
+  --accent-soft: #e3edfa;
+  --bar: #2a78d6;
+  --track: #e3e6eb;
+  --good: #0ca30c;
+  --warn: #fab219;
+  --crit: #d03b3b;
+  --idle: #8a91a0;
+  --good-bg: #e4f4e2;
+  --warn-bg: #fdf0cf;
+  --crit-bg: #f9e1e0;
+  --idle-bg: #e9ebef;
+  --font-display: "IBM Plex Sans Condensed", "Arial Narrow", sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121418; --surface: #1a1c21; --ink: #eef0f3; --ink-2: #bcc1cb; --ink-3: #8f96a3;
+    --line: #33373f; --line-soft: #272a31; --accent: #6da7ec; --accent-ink: #0d1520; --accent-soft: #1c2b40;
+    --bar: #3987e5; --track: #2c3038; --idle: #8a91a0;
+    --good-bg: #17301a; --warn-bg: #3a2f10; --crit-bg: #3b1c1c; --idle-bg: #2a2d34;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121418; --surface: #1a1c21; --ink: #eef0f3; --ink-2: #bcc1cb; --ink-3: #8f96a3;
+  --line: #33373f; --line-soft: #272a31; --accent: #6da7ec; --accent-ink: #0d1520; --accent-soft: #1c2b40;
+  --bar: #3987e5; --track: #2c3038; --idle: #8a91a0;
+  --good-bg: #17301a; --warn-bg: #3a2f10; --crit-bg: #3b1c1c; --idle-bg: #2a2d34;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--font-body); }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+
+.top { background: var(--surface); border-bottom: 1px solid var(--line); }
+.top-in { max-width: 1180px; margin: 0 auto; padding: 12px 20px 0; display: flex; flex-direction: column; gap: 10px; }
+.brand-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding-bottom: 2px; }
+.brand { font: 600 20px/1.1 var(--font-display); letter-spacing: .01em; margin: 0; }
+.who { display: flex; gap: 10px; align-items: center; color: var(--ink-2); font-size: 13px; }
+.who b { color: var(--ink); font-weight: 600; }
+.tabs { display: flex; gap: 2px; overflow-x: auto; min-height: 10px; }
+.tabs a { padding: 8px 12px; text-decoration: none; color: var(--ink-2); border-bottom: 2px solid transparent; white-space: nowrap; font-weight: 500; }
+.tabs a:hover { color: var(--ink); }
+.tabs a[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
+.tabs .count { font: 500 11px var(--font-num); background: var(--warn-bg); color: var(--ink); border-radius: 9px; padding: 1px 6px; margin-left: 5px; }
+
+main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 48px; display: flex; flex-direction: column; gap: 16px; }
+.notice { background: var(--warn-bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; font-size: 13px; }
+.head { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-end; justify-content: space-between; }
+h2 { font: 600 22px/1.15 var(--font-display); margin: 0; text-wrap: balance; }
+.sub { color: var(--ink-3); font-size: 13px; margin: 2px 0 0; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+label.f { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; }
+label.f > * { text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--ink); }
+input, select, textarea { background: var(--surface); border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; min-height: 34px; }
+input[type="number"] { font-family: var(--font-num); text-align: right; }
+input[type="radio"] { min-height: 0; }
+textarea { width: 100%; min-height: 60px; resize: vertical; }
+.btn { background: var(--surface); border: 1px solid var(--line); border-radius: 5px; padding: 6px 12px; min-height: 34px; cursor: pointer; font-weight: 500; }
+.btn:hover { border-color: var(--ink-3); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.danger { color: var(--crit); }
+.btn.small { padding: 3px 8px; min-height: 26px; font-size: 12px; }
+.btn:disabled { opacity: .5; cursor: default; }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.tile .k { font-size: 12px; color: var(--ink-3); }
+.tile .v { font: 500 22px/1.2 var(--font-num); font-variant-numeric: tabular-nums; }
+.tile .n { font-size: 12px; color: var(--ink-2); }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.panel > h3 { font: 600 15px var(--font-display); margin: 0; padding: 12px 14px 4px; }
+.panel > .sub { padding: 0 14px 8px; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th { text-align: left; font: 500 11px var(--font-body); text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); padding: 8px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th.num { text-align: right; }
+td { padding: 8px 12px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: 0; }
+tr.click { cursor: pointer; }
+tr.click:hover td { background: var(--accent-soft); }
+tfoot td { border-top: 1px solid var(--line); border-bottom: 0; font-weight: 600; }
+.empty { padding: 28px 14px; text-align: center; color: var(--ink-3); }
+.ono { font-family: var(--font-num); font-weight: 500; white-space: nowrap; }
+.muted { color: var(--ink-3); font-size: 12px; }
+.why { max-width: 260px; font-size: 13px; color: var(--ink-2); }
+
+.pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: 500; white-space: nowrap; }
+.pill i { width: 8px; height: 8px; flex: none; }
+.pill.billed, .pill.order { background: var(--good-bg); } .pill.billed i, .pill.order i { background: var(--good); border-radius: 50%; }
+.pill.part { background: var(--warn-bg); } .pill.part i { background: linear-gradient(90deg, var(--warn) 50%, transparent 50%); border: 1px solid var(--warn); border-radius: 50%; }
+.pill.approval { background: var(--warn-bg); } .pill.approval i { border: 2px solid var(--warn); }
+.pill.approved { background: var(--accent-soft); } .pill.approved i { background: var(--bar); }
+.pill.rejected { background: var(--crit-bg); } .pill.rejected i { background: var(--crit); transform: rotate(45deg); }
+.pill.pending, .pill.noorder { background: var(--idle-bg); } .pill.pending i, .pill.noorder i { border: 2px solid var(--idle); border-radius: 50%; }
+
+.meterbox { min-width: 140px; }
+.meter { position: relative; height: 10px; background: var(--track); border-radius: 0 4px 4px 0; }
+.meter b { position: absolute; left: 0; top: 0; bottom: 0; background: var(--bar); border-radius: 0 4px 4px 0; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--ink-2); padding: 0 14px 10px; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.legend .lb::before { background: var(--bar); } .legend .lo::before { background: var(--track); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 12px; }
+.chip { background: var(--idle-bg); border-radius: 4px; padding: 2px 8px; font-size: 12px; }
+.chip b { font-family: var(--font-num); font-weight: 500; margin-left: 4px; }
+
+.form { padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+.grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.grid3 label.f input, .grid3 label.f select { width: 100%; }
+.lines td { padding: 4px 6px; border: 0; }
+.lines th { padding: 4px 6px; }
+.lines input, .lines select { width: 100%; }
+.lines .w-item { min-width: 220px; } .lines .w-s { min-width: 84px; }
+.row-end { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.total { font: 500 16px var(--font-num); }
+.err { color: var(--crit); font-size: 13px; }
+.box { border: 1px solid var(--line); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.box > strong { font: 600 14px var(--font-display); }
+
+.overlay { position: fixed; inset: 0; background: rgba(10, 14, 20, .5); display: flex; align-items: flex-start; justify-content: center; padding: 4vh 16px; overflow-y: auto; z-index: 10; }
+.dialog { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; width: min(860px, 100%); display: flex; flex-direction: column; gap: 14px; padding: 18px; }
+.dialog.narrow { width: min(440px, 100%); }
+.dialog h3 { font: 600 19px var(--font-display); margin: 0; }
+.meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.meta div span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); }
+.trail { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.choices { display: flex; gap: 8px; flex-wrap: wrap; }
+.choices label { border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; display: flex; gap: 8px; align-items: center; cursor: pointer; }
+.choices label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.split { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.inline { display: flex; gap: 8px; padding: 10px 14px; flex-wrap: wrap; align-items: flex-end; }
+.inline label.f { flex: 1; min-width: 110px; }
+.inline label.f input, .inline label.f select { width: 100%; }
+details.bulk { padding: 0 14px 12px; font-size: 13px; }
+details.bulk summary { cursor: pointer; color: var(--accent); }
+details.bulk textarea { margin: 8px 0; font-family: var(--font-num); font-size: 13px; }
+.login { max-width: 400px; margin: 6vh auto 0; width: 100%; }
+.login .form { gap: 12px; }
+.login label.f input { width: 100%; }
+.toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 6px; z-index: 20; font-size: 13px; max-width: 90vw; }
+@media (max-width: 480px) { .top-in, main { padding-left: 16px; padding-right: 16px; } .tile .v { font-size: 19px; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <div class="brand-row">
+      <h1 class="brand">Sales Billing Desk</h1>
+      <div class="who" id="who"></div>
+    </div>
+    <nav class="tabs" id="tabs" aria-label="Sections"></nav>
+  </div>
+</header>
+<main id="main"><div class="empty">Loading…</div></main>
+<div id="overlayHost"></div>
+<div id="toastHost" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- pure logic ---------- */
+  var STATUS = { pending: 'To be billed', approval: 'Sent for approval', approved: 'Approved, to be billed', part: 'Part billed', billed: 'Billed', rejected: 'Rejected' };
+  var ROLE = { sales: 'Salesperson', billing: 'Billing', admin: 'Admin' };
+  var REASONS = ['Already has stock', 'Not satisfied with the product', 'Delivery issues', 'Payment problem', 'High outstanding due, order not taken', 'Price too high', 'Customer not available', 'Other'];
+  var qfmt = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 });
+  function qty(n) { return qfmt.format(n || 0); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function num(v) { var n = parseFloat(v); return isFinite(n) ? n : 0; }
+  function p2(n) { return String(n).padStart(2, '0'); }
+  function today() { var d = new Date(); return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); }
+  function nowTime() { var d = new Date(); return p2(d.getHours()) + ':' + p2(d.getMinutes()); }
+  function dmy(s) { if (!s) return ''; var p = String(s).split('-'); return p.length === 3 ? p[2] + '-' + p[1] + '-' + p[0] : s; }
+  function lines(o) { return Array.isArray(o.lines) ? o.lines : []; }
+  function unitOf(l) { return l.unit === 'L' ? 'L' : 'Nos'; }
+  /* One quantity of an item counts as `per` litres or nos: Take of Oil 8L, quantity 1 = 8 L. */
+  function inUnit(l, q) { return num(q) * (num(l.per) || 1); }
+  var DEFAULT_CATS = ['Lubricants', 'Tyres', 'Batteries', 'Inverters'];
+  /* Category comes from the admin's stock list, so re-categorising an item updates the reports. */
+  function catOf(l) {
+    var it = (l.itemId && S.stock[l.itemId]) || findByName(list('stock'), l.item);
+    return (it && it.category) || l.category || 'Uncategorised';
+  }
+  function categories() {
+    var seen = {}; DEFAULT_CATS.forEach(function (c) { seen[c] = 1; });
+    list('stock').forEach(function (i) { if (i.category) seen[i.category] = 1; });
+    return Object.keys(seen).sort();
+  }
+  function totals(o, field, cat) { var t = { L: 0, N: 0 }; lines(o).forEach(function (l) { if (cat && catOf(l) !== cat) return; t[unitOf(l) === 'L' ? 'L' : 'N'] += inUnit(l, l[field]); }); return t; }
+  function addT(a, b) { a.L += b.L; a.N += b.N; return a; }
+  function fmtT(t) { var p = []; if (t.L) p.push(qty(t.L) + ' L'); if (t.N) p.push(qty(t.N) + ' Nos'); return p.length ? p.join(' + ') : '0'; }
+  function statusOf(o) { return STATUS[o.status] ? o.status : 'pending'; }
+  function isBilled(o) { var s = statusOf(o); return s === 'billed' || s === 'part'; }
+  function canBillNow(o) { var s = statusOf(o); return s === 'pending' || s === 'approved' || s === 'billed' || s === 'part'; }
+
+  /* Check the biller's entry and return the fields to save, or an error message. */
+  function buildBilling(order, input) {
+    var bad = null, tot = 0, full = true;
+    var out = lines(order).map(function (l, i) {
+      var b = num(input.billedQtys[i]);
+      if (b < 0 || b > num(l.qty)) bad = 'Billed quantity for ' + l.item + ' must be between 0 and ' + qty(l.qty) + '.';
+      if (b < num(l.qty)) full = false;
+      tot += b;
+      return Object.assign({}, l, { billedQty: b });
+    });
+    if (!canBillNow(order)) return { error: 'This order cannot be billed until the admin approves it.' };
+    if (bad) return { error: bad };
+    if (tot <= 0) return { error: 'Enter the billed quantity for at least one item. To refuse the whole order, use Reject order.' };
+    if (!String(input.invoiceNo || '').trim()) return { error: 'Enter the bill number.' };
+    if (!input.billDate) return { error: 'Enter the bill date.' };
+    return { fields: { status: full ? 'billed' : 'part', lines: out, invoiceNo: String(input.invoiceNo).trim(), billDate: input.billDate, billNote: String(input.note || '').trim() } };
+  }
+  function summarise(orders, cat) {
+    var t = { count: 0, billedCount: 0, partCount: 0, toBill: 0, approval: 0, rejected: 0, ord: { L: 0, N: 0 }, bil: { L: 0, N: 0 } };
+    orders.forEach(function (o) {
+      if (cat && !lines(o).some(function (l) { return catOf(l) === cat; })) return;
+      var s = statusOf(o);
+      t.count++; addT(t.ord, totals(o, 'qty', cat));
+      if (isBilled(o)) { t.billedCount++; addT(t.bil, totals(o, 'billedQty', cat)); if (s === 'part') t.partCount++; }
+      if (s === 'pending' || s === 'approved') t.toBill++;
+      if (s === 'approval') t.approval++;
+      if (s === 'rejected') t.rejected++;
+    });
+    return t;
+  }
+  function nextOrderNo(orders) {
+    var max = 0;
+    orders.forEach(function (o) { var m = /(\d+)\s*$/.exec(o.no || ''); if (m) max = Math.max(max, parseInt(m[1], 10)); });
+    return 'SO-' + String(max + 1).padStart(4, '0');
+  }
+  window.__logic = { buildBilling: buildBilling, summarise: summarise, nextOrderNo: nextOrderNo, totals: totals, fmtT: fmtT };
+
+  /* ---------- state ---------- */
+  var S = { users: {}, customers: {}, stock: {}, visits: {}, salesorders: {}, ready: false, stale: false, fatal: '', hasAdmin: true, busy: false };
+  function monthStart() { return today().slice(0, 8) + '01'; }
+  var UI = { uid: '', view: '', from: monthStart(), to: '', sp: '', status: '', q: '', cat: '' };
+  var main = document.getElementById('main'), tabs = document.getElementById('tabs'), who = document.getElementById('who');
+  var overlayHost = document.getElementById('overlayHost'), toastHost = document.getElementById('toastHost');
+
+  function list(coll) { return Object.keys(S[coll]).map(function (id) { return Object.assign({ id: id }, S[coll][id]); }); }
+  function byName(a, b) { return String(a.name).localeCompare(String(b.name)); }
+  function me() { var u = S.users[UI.uid]; return u && u.active !== false ? Object.assign({ id: UI.uid }, u) : null; }
+  function role() { var u = me(); return u ? u.role : ''; }
+  function salesUsers() { return list('users').filter(function (u) { return u.role === 'sales'; }).sort(byName); }
+  function userName(id) { return (S.users[id] && S.users[id].name) || 'Unknown'; }
+  function activeCustomers() { return list('customers').filter(function (c) { return c.active !== false; }).sort(byName); }
+  function activeItems() { return list('stock').filter(function (c) { return c.active !== false; }).sort(byName); }
+  function inPeriod(d) { return !(UI.from && (d || '') < UI.from) && !(UI.to && (d || '') > UI.to); }
+  function spOk(id) { var r = role(); if (r === 'sales') return id === UI.uid; return !UI.sp || id === UI.sp; }
+
+  function visibleOrders(opts) {
+    opts = opts || {};
+    return list('salesorders').filter(function (o) {
+      if (!spOk(o.spId)) return false;
+      if (!opts.anyDate && !inPeriod(o.date)) return false;
+      if (opts.status && UI.status && statusOf(o) !== UI.status) return false;
+      if (opts.search && UI.q) {
+        var hay = ((o.no || '') + ' ' + (o.customerName || '') + ' ' + (o.invoiceNo || '')).toLowerCase();
+        if (hay.indexOf(UI.q.toLowerCase()) < 0) return false;
+      }
+      return true;
+    }).sort(function (a, b) { return (b.date || '').localeCompare(a.date || '') || (b.no || '').localeCompare(a.no || ''); });
+  }
+  function visibleVisits() {
+    return list('visits').filter(function (v) { return spOk(v.spId) && inPeriod(v.date); })
+      .sort(function (a, b) { return (b.date || '').localeCompare(a.date || '') || (b.time || '').localeCompare(a.time || ''); });
+  }
+
+  /* ---------- storage: Supabase (Postgres) over its REST API ---------- */
+  var TABLE = { users: 'profiles', customers: 'customers', stock: 'stock_items', visits: 'visits', salesorders: 'orders' };
+  var MAP = {
+    users: { name: 'name', username: 'username', role: 'role', active: 'active' },
+    customers: { name: 'name', area: 'area', active: 'active' },
+    stock: { name: 'name', category: 'category', unit: 'unit', per: 'per', active: 'active' },
+    visits: { date: 'visit_date', time: 'visit_time', spId: 'sp_id', customerId: 'customer_id', customerName: 'customer_name', note: 'note', outcome: 'outcome', reason: 'reason', reasonOther: 'reason_other', orderId: 'order_id', createdAt: 'created_at' },
+    salesorders: { no: 'order_no', date: 'order_date', time: 'order_time', spId: 'sp_id', customerId: 'customer_id', customerName: 'customer_name', lines: 'lines', description: 'description', status: 'status', invoiceNo: 'invoice_no', billDate: 'bill_date', billNote: 'bill_note', reqNote: 'req_note', reqBy: 'req_by', reqAt: 'req_at', decision: 'decision', decisionNote: 'decision_note', decidedAt: 'decided_at', rejectNote: 'reject_note', rejectedBy: 'rejected_by', rejectedAt: 'rejected_at', billedBy: 'billed_by', billedAt: 'billed_at', createdAt: 'created_at' }
+  };
+  var NULLABLE = { bill_date: 1, req_by: 1, req_at: 1, decided_at: 1, rejected_at: 1, billed_by: 1, billed_at: 1, customer_id: 1, order_id: 1 };
+  var CFG = null, SES = null, refreshing = null;
+  function fromRow(coll, r) { var d = {}, m = MAP[coll]; Object.keys(m).forEach(function (k) { var v = r[m[k]]; d[k] = v == null ? '' : v; }); return d; }
+  function toRow(coll, d) { var r = {}, m = MAP[coll]; Object.keys(d).forEach(function (k) { if (!m[k]) return; var v = d[k]; r[m[k]] = v === '' && NULLABLE[m[k]] ? null : v; }); return r; }
+
+  function toast(msg) {
+    toastHost.innerHTML = '<div class="toast">' + esc(msg) + '</div>';
+    clearTimeout(toast.t); toast.t = setTimeout(function () { toastHost.innerHTML = ''; }, 4000);
+  }
+  function saveSes(s) { SES = s; try { if (s) localStorage.setItem('sbd-session', JSON.stringify(s)); else localStorage.removeItem('sbd-session'); } catch (e) {} }
+  function sesFrom(j) { return { access: j.access_token, refresh: j.refresh_token, exp: Date.now() + (j.expires_in || 3600) * 1000, uid: j.user && j.user.id }; }
+  function readJson(r) { return r.text().then(function (t) { try { return t ? JSON.parse(t) : null; } catch (e) { return null; } }); }
+  /* A valid access token, renewed with the refresh token shortly before it expires. */
+  function token() {
+    if (!SES) return Promise.reject({ code: 'signed_out' });
+    if (SES.exp - Date.now() > 60000) return Promise.resolve(SES.access);
+    if (!refreshing) {
+      var uid = SES.uid;
+      refreshing = fetch(CFG.url + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { apikey: CFG.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: SES.refresh }) })
+        .then(function (r) { return readJson(r).then(function (j) { if (!r.ok || !j || !j.access_token) throw { code: 'signed_out' }; var s = sesFrom(j); s.uid = uid; saveSes(s); return s.access; }); })
+        .finally(function () { refreshing = null; });
+    }
+    return refreshing;
+  }
+  function rest(method, path, body) {
+    return token().then(function (t) {
+      return fetch(CFG.url + '/rest/v1/' + path, { method: method, headers: { apikey: CFG.key, Authorization: 'Bearer ' + t, 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: body ? JSON.stringify(body) : undefined });
+    }).then(function (r) {
+      return readJson(r).then(function (j) { if (!r.ok) throw { code: r.status === 401 ? 'signed_out' : 'db', message: (j && (j.message || j.msg)) || '' }; return j || []; });
+    });
+  }
+  function server(method, path, body) {
+    var go = function (t) { return fetch('/api/' + path, { method: method, headers: Object.assign({ 'Content-Type': 'application/json' }, t ? { Authorization: 'Bearer ' + t } : {}), body: body ? JSON.stringify(body) : undefined }); };
+    return (SES ? token().then(go) : go('')).then(function (r) { return readJson(r).then(function (j) { if (!r.ok) throw { code: 'server', message: (j && j.error) || '' }; return j || {}; }); });
+  }
+  function fetchAll(table, q) {
+    var out = [];
+    function page(off) {
+      return rest('GET', table + '?select=*' + (q ? '&' + q : '') + '&order=id&limit=1000&offset=' + off).then(function (rows) { out = out.concat(rows); return rows.length === 1000 ? page(off + 1000) : out; });
+    }
+    return page(0);
+  }
+  function fail(e) {
+    if (e && e.code === 'signed_out') { toast('Your session ended. Sign in again.'); setUser(''); return; }
+    toast((e && e.message) || 'Could not save. Check your connection and try again.');
+  }
+  var DENIED = { code: 'db', message: 'You do not have permission to do this.' };
+  /* Each write resolves to the saved record id, or null after showing what went wrong. */
+  function insert(coll, doc) {
+    return rest('POST', TABLE[coll], toRow(coll, doc)).then(function (rows) { if (!rows.length) throw DENIED; S[coll][rows[0].id] = fromRow(coll, rows[0]); return rows[0].id; }).catch(function (e) { fail(e); return null; });
+  }
+  function insertMany(coll, docs) {
+    return rest('POST', TABLE[coll], docs.map(function (d) { return toRow(coll, d); })).then(function (rows) { rows.forEach(function (r) { S[coll][r.id] = fromRow(coll, r); }); return rows.length; }).catch(function (e) { fail(e); return null; });
+  }
+  function update(coll, id, patch) {
+    return rest('PATCH', TABLE[coll] + '?id=eq.' + id, toRow(coll, patch)).then(function (rows) { if (!rows.length) throw DENIED; S[coll][id] = fromRow(coll, rows[0]); return id; }).catch(function (e) { fail(e); return null; });
+  }
+  function remove(coll, id) {
+    return rest('DELETE', TABLE[coll] + '?id=eq.' + id).then(function (rows) { if (!rows.length) throw DENIED; delete S[coll][id]; return id; }).catch(function (e) { fail(e); return null; });
+  }
+  function setColl(coll, rows) { var m = {}; rows.forEach(function (r) { m[r.id] = fromRow(coll, r); }); S[coll] = m; }
+  function periodQ(col) { return [UI.from ? col + '=gte.' + UI.from : '', UI.to ? col + '=lte.' + UI.to : ''].filter(Boolean).join('&'); }
+  function loadMasters() {
+    return Promise.all([fetchAll('profiles'), fetchAll('customers'), fetchAll('stock_items')]).then(function (a) { setColl('users', a[0]); setColl('customers', a[1]); setColl('stock', a[2]); });
+  }
+  /* Only the chosen period is loaded, plus every order still open and today's visits, so history can grow without slowing the app. */
+  function loadPeriod() {
+    return Promise.all([fetchAll('orders', periodQ('order_date')), fetchAll('orders', 'status=in.(pending,approval,approved,part)'), fetchAll('visits', periodQ('visit_date')), fetchAll('visits', 'visit_date=eq.' + today())]).then(function (a) {
+      setColl('salesorders', a[0].concat(a[1])); setColl('visits', a[2].concat(a[3]));
+    });
+  }
+  function reload(all) {
+    if (!SES) return Promise.resolve();
+    S.busy = true;
+    return (all ? loadMasters() : Promise.resolve()).then(loadPeriod).then(function () { S.stale = false; }, function (e) {
+      if (e && e.code === 'signed_out') { toast('Your session ended. Sign in again.'); return setUser(''); }
+      S.stale = true;
+    }).then(function () { S.busy = false; S.ready = true; render(false); });
+  }
+  function checkAdmin() {
+    return fetch('/api/users').then(function (r) { return readJson(r).then(function (j) { if (!r.ok) throw 0; S.hasAdmin = !!(j && j.hasAdmin); }); })
+      .catch(function () { S.fatal = 'The app cannot reach its database. Check the Supabase settings in Vercel, then reload this page.'; })
+      .then(function () { S.ready = true; render(true); });
+  }
+  function boot() {
+    fetch('/api/config').then(function (r) { return readJson(r).then(function (c) { if (!r.ok || !c || !c.url || !c.key) throw 0; CFG = c; }); }).then(function () {
+      try { SES = JSON.parse(localStorage.getItem('sbd-session') || 'null'); } catch (e) { SES = null; }
+      if (SES && SES.uid && SES.refresh) { UI.uid = SES.uid; return reload(true); }
+      SES = null; return checkAdmin();
+    }, function () { S.fatal = 'The app is not connected to its database yet. Set the Supabase values in Vercel, redeploy, then reload this page.'; S.ready = true; render(true); });
+  }
+  setInterval(function () { if (me() && !S.busy && !openId && !formSave && document.visibilityState === 'visible') reload(false); }, 60000);
+
+  /* ---------- chrome ---------- */
+  var VIEWS = {
+    sales: [['new-visit', 'New visit'], ['my-visits', 'My visits'], ['orders', 'My orders'], ['dashboard', 'My summary']],
+    billing: [['to-bill', 'Orders to bill'], ['orders', 'All orders']],
+    admin: [['dashboard', 'Dashboard'], ['approvals', 'Approvals'], ['orders', 'Orders'], ['visits', 'Visits'], ['items', 'Stock items'], ['customers', 'Customers'], ['users', 'Users and logins']]
+  };
+  function renderChrome() {
+    var u = me();
+    if (!u) { who.innerHTML = ''; tabs.innerHTML = ''; return; }
+    who.innerHTML = '<span><b>' + esc(u.name) + '</b> · ' + ROLE[u.role] + '</span><button class="btn small" type="button" data-act="refresh">Refresh</button><button class="btn small" type="button" data-act="signOut">Sign out</button>';
+    var vs = VIEWS[u.role] || [];
+    if (!vs.some(function (v) { return v[0] === UI.view; })) UI.view = vs[0][0];
+    var os = list('salesorders');
+    var nBill = os.filter(function (o) { var s = statusOf(o); return s === 'pending' || s === 'approved'; }).length;
+    var nAppr = os.filter(function (o) { return statusOf(o) === 'approval'; }).length;
+    tabs.innerHTML = vs.map(function (v) {
+      var n = v[0] === 'to-bill' ? nBill : v[0] === 'approvals' ? nAppr : 0;
+      return '<a href="#' + v[0] + '"' + (v[0] === UI.view ? ' aria-current="page"' : '') + '>' + v[1] + (n ? '<span class="count">' + n + '</span>' : '') + '</a>';
+    }).join('');
+  }
+  window.addEventListener('hashchange', function () { var h = (location.hash || '').slice(1); if (h) UI.view = h; render(true); });
+  function go(v) { UI.view = v; try { history.replaceState(null, '', '#' + v); } catch (e) {} }
+
+  /* ---------- shared pieces ---------- */
+  function pill(s) { return '<span class="pill ' + s + '"><i></i>' + STATUS[s] + '</span>'; }
+  function notices() {
+    var h = '';
+    if (S.stale) h += '<div class="notice">The database cannot be reached right now. What you see may be out of date. Check your connection, then choose Refresh.</div>';
+    return h;
+  }
+  function filterBar(o) {
+    o = o || {};
+    var h = '<div class="filters">';
+    h += '<label class="f" for="fFrom">From<input type="date" id="fFrom" value="' + esc(UI.from) + '"></label>';
+    h += '<label class="f" for="fTo">To<input type="date" id="fTo" value="' + esc(UI.to) + '"></label>';
+    if (role() !== 'sales') h += '<label class="f" for="fSp">Salesperson<select id="fSp"><option value="">All</option>' + salesUsers().map(function (p) { return '<option value="' + esc(p.id) + '"' + (UI.sp === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>'; }).join('') + '</select></label>';
+    if (o.cat) h += '<label class="f" for="fCat">Category<select id="fCat"><option value="">All</option>' + categories().concat(['Uncategorised']).map(function (c) { return '<option' + (UI.cat === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select></label>';
+    if (o.status) h += '<label class="f" for="fSt">Status<select id="fSt"><option value="">All</option>' + Object.keys(STATUS).map(function (k) { return '<option value="' + k + '"' + (UI.status === k ? ' selected' : '') + '>' + STATUS[k] + '</option>'; }).join('') + '</select></label>';
+    if (o.search) h += '<label class="f" for="fQ">Search<input type="search" id="fQ" placeholder="Order, customer, bill no." value="' + esc(UI.q) + '"></label>';
+    h += '<button class="btn" type="button" data-act="today">Today</button><button class="btn" type="button" data-act="month">This month</button>';
+    if (UI.from !== monthStart() || UI.to || UI.sp || UI.status || UI.q || UI.cat) h += '<button class="btn" type="button" data-act="clearFilters">Reset</button>';
+    return h + '</div>';
+  }
+  function periodText() {
+    if (UI.from && UI.to) return UI.from === UI.to ? 'on ' + dmy(UI.from) : dmy(UI.from) + ' to ' + dmy(UI.to);
+    if (UI.from) return 'from ' + dmy(UI.from);
+    if (UI.to) return 'up to ' + dmy(UI.to);
+    return 'all dates';
+  }
+  function whyText(o) {
+    var s = statusOf(o);
+    if (s === 'rejected') return (o.rejectedBy === 'admin' ? 'Admin: ' : 'Billing: ') + (o.rejectNote || '');
+    if (s === 'approval') return 'Billing asked admin: ' + (o.reqNote || '');
+    if (s === 'approved') return 'Admin approved' + (o.decisionNote ? ': ' + o.decisionNote : '');
+    if (s === 'part') return o.billNote || 'Billed less than ordered';
+    return o.billNote || '';
+  }
+  function ordersTable(os, emptyMsg) {
+    var h = '<div class="scroll"><table><thead><tr><th>Order</th><th>Date</th><th>Salesperson</th><th>Customer</th><th class="num">Ordered</th><th class="num">Billed</th><th>Status</th><th>Reason or note</th></tr></thead><tbody>';
+    if (!os.length) h += '<tr><td colspan="8" class="empty">' + emptyMsg + '</td></tr>';
+    os.forEach(function (o) {
+      h += '<tr class="click" tabindex="0" data-act="open" data-id="' + esc(o.id) + '"><td class="ono">' + esc(o.no) + '</td><td>' + dmy(o.date) + '</td><td>' + esc(userName(o.spId)) + '</td><td>' + esc(o.customerName) + '</td><td class="num">' + fmtT(totals(o, 'qty')) + '</td><td class="num">' + (isBilled(o) ? fmtT(totals(o, 'billedQty')) : '<span class="muted">nil</span>') + '</td><td>' + pill(statusOf(o)) + '</td><td class="why">' + esc(whyText(o)) + '</td></tr>';
+    });
+    h += '</tbody>';
+    if (os.length > 1) { var t = summarise(os); h += '<tfoot><tr><td colspan="4">' + os.length + ' orders</td><td class="num">' + fmtT(t.ord) + '</td><td class="num">' + fmtT(t.bil) + '</td><td colspan="2"></td></tr></tfoot>'; }
+    return h + '</table></div>';
+  }
+
+  /* ---------- sign in ---------- */
+  function viewLogin() {
+    var hasAdmin = S.hasAdmin;
+    var h = '<section class="panel login"><h3>' + (hasAdmin ? 'Sign in' : 'Create the admin login') + '</h3><div class="form">';
+    if (!hasAdmin) h += '<p class="sub">No admin exists yet. The admin adds salespeople, the billing person, items and customers.</p><label class="f" for="lName">Your name<input id="lName" autocomplete="name"></label>';
+    h += '<label class="f" for="lUser">Username<input id="lUser" autocomplete="username" autocapitalize="none"></label><label class="f" for="lPin">Password<input id="lPin" type="password" autocomplete="' + (hasAdmin ? 'current-password' : 'new-password') + '"></label>';
+    h += '<span class="err" id="lErr" role="alert"></span><button class="btn primary" type="button" id="lGo" data-act="' + (hasAdmin ? 'signIn' : 'createAdmin') + '">' + (hasAdmin ? 'Sign in' : 'Create admin and sign in') + '</button></div></section>';
+    return h;
+  }
+  function loginWith(un, pw) {
+    var btn = document.getElementById('lGo'); if (btn) btn.disabled = true;
+    return server('POST', 'login', { username: un, password: pw }).then(function (j) {
+      saveSes(sesFrom(j)); UI.uid = SES.uid; UI.view = ''; S.ready = false; render(true); return reload(true);
+    }, function (e) {
+      if (btn) btn.disabled = false;
+      var el = document.getElementById('lErr'); if (el) el.textContent = (e && e.message) || 'Could not sign in. Check your connection and try again.';
+    });
+  }
+  function signIn() { loginWith(document.getElementById('lUser').value.trim().toLowerCase(), document.getElementById('lPin').value); }
+  function createAdmin() {
+    var n = document.getElementById('lName').value.trim(), un = document.getElementById('lUser').value.trim().toLowerCase(), pw = document.getElementById('lPin').value, err = document.getElementById('lErr');
+    if (!n || !un || pw.length < 6) { err.textContent = 'Enter your name, a username and a password of at least 6 characters.'; return; }
+    var btn = document.getElementById('lGo'); btn.disabled = true;
+    server('POST', 'users', { name: n, username: un, password: pw, role: 'admin' }).then(function () { return loginWith(un, pw); }, function (e) { btn.disabled = false; err.textContent = (e && e.message) || 'Could not create the admin. Try again.'; });
+  }
+  function setUser(id) {
+    UI.uid = id; UI.view = ''; UI.from = monthStart(); UI.to = UI.sp = UI.status = UI.q = UI.cat = '';
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    if (!id) {
+      saveSes(null); closeDialog();
+      ['users', 'customers', 'stock', 'visits', 'salesorders'].forEach(function (c) { S[c] = {}; });
+      S.ready = false; render(true); checkAdmin();
+    }
+  }
+
+  /* ---------- dashboard (admin) and my summary (sales) ---------- */
+  function pctOf(b, o) { var den = o.L || o.N, n = o.L ? b.L : b.N; return den ? Math.round(n / den * 100) : 0; }
+  function soldCells(c) {
+    var p = pctOf(c.bil, c.ord);
+    return '<td class="num">' + Object.keys(c.orders).length + '</td><td class="num">' + fmtT(c.ord) + '</td><td class="num">' + fmtT(c.bil) + '</td><td><div class="meterbox"><div class="meter" title="Sold ' + fmtT(c.bil) + ' of ' + fmtT(c.ord) + ' ordered"><b style="width:' + Math.min(p, 100) + '%"></b></div></div></td><td class="num">' + p + '%</td>';
+  }
+  function viewDashboard() {
+    var sales = role() === 'sales', os = visibleOrders(), vs = visibleVisits(), cat = UI.cat, t = summarise(os, cat);
+    var h = '<div class="head"><div><h2>' + (sales ? 'My summary' : 'Orders and billing') + '</h2><p class="sub">Orders placed ' + periodText() + (cat ? ', ' + esc(cat) + ' only' : '') + '. Sold quantity counts only what was billed.</p></div>' + filterBar({ cat: true }) + '</div>';
+    h += '<div class="tiles">';
+    h += '<div class="tile"><span class="k">Visits</span><span class="v">' + vs.length + '</span><span class="n">' + vs.filter(function (v) { return v.outcome === 'order'; }).length + ' gave an order</span></div>';
+    h += '<div class="tile"><span class="k">Total orders</span><span class="v">' + t.count + '</span><span class="n">' + fmtT(t.ord) + ' ordered</span></div>';
+    h += '<div class="tile"><span class="k">Total billed</span><span class="v">' + t.billedCount + '</span><span class="n">' + t.partCount + ' of them part billed</span></div>';
+    h += '<div class="tile"><span class="k">Litres sold</span><span class="v">' + qty(t.bil.L) + ' L</span><span class="n">of ' + qty(t.ord.L) + ' L ordered</span></div>';
+    h += '<div class="tile"><span class="k">Nos sold</span><span class="v">' + qty(t.bil.N) + '</span><span class="n">of ' + qty(t.ord.N) + ' Nos ordered</span></div>';
+    h += '<div class="tile"><span class="k">Not billed yet</span><span class="v">' + (t.toBill + t.approval) + '</span><span class="n">' + t.toBill + ' to bill, ' + t.approval + ' in approval, ' + t.rejected + ' rejected</span></div>';
+    h += '</div>';
+
+    var m = {}, all = {};
+    function cell(box, k) { return box[k] || (box[k] = { orders: {}, ord: { L: 0, N: 0 }, bil: { L: 0, N: 0 } }); }
+    os.forEach(function (o) {
+      lines(o).forEach(function (l) {
+        var c = catOf(l); if (cat && c !== cat) return;
+        var u = unitOf(l) === 'L' ? 'L' : 'N';
+        [cell(m[o.spId] || (m[o.spId] = {}), c), cell(all, c)].forEach(function (x) {
+          x.orders[o.id] = 1; x.ord[u] += inUnit(l, l.qty); if (isBilled(o)) x.bil[u] += inUnit(l, l.billedQty);
+        });
+      });
+    });
+    var headRow = '<th>Category</th><th class="num">Orders</th><th class="num">Ordered</th><th class="num">Sold (billed)</th><th style="width:20%">Sold of ordered</th><th class="num">Sold %</th>';
+    var cats = Object.keys(all).sort();
+    h += '<section class="panel"><h3>' + (sales ? 'My sales by category' : 'Sold by category') + '</h3><p class="sub">Each bar shows how much of the ordered quantity was billed, from 0 to 100%.</p><div class="scroll"><table><thead><tr>' + headRow + '</tr></thead><tbody>';
+    if (!cats.length) h += '<tr><td colspan="6" class="empty">No orders match this period and filter.</td></tr>';
+    cats.forEach(function (c) { h += '<tr><td>' + esc(c) + '</td>' + soldCells(all[c]) + '</tr>'; });
+    h += '</tbody></table></div></section>';
+
+    if (!sales) {
+      var ppl = salesUsers().filter(function (p) { return spOk(p.id) && (m[p.id] || p.active !== false); });
+      h += '<section class="panel"><h3>Sold by salesperson and category</h3><p class="sub">Change the period, salesperson or category with the filters above.</p><div class="scroll"><table><thead><tr><th>Salesperson</th><th class="num">Visits</th>' + headRow + '</tr></thead><tbody>';
+      if (!ppl.length) h += '<tr><td colspan="8" class="empty">No salespeople yet. Add them under Users and logins.</td></tr>';
+      ppl.forEach(function (p) {
+        var box = m[p.id] || {}, ks = Object.keys(box).sort(), nv = vs.filter(function (v) { return v.spId === p.id; }).length;
+        var name = '<td rowspan="' + Math.max(ks.length, 1) + '" style="vertical-align:top"><b>' + esc(p.name) + '</b>' + (p.active === false ? ' <span class="muted">(off)</span>' : '') + '</td><td class="num" rowspan="' + Math.max(ks.length, 1) + '" style="vertical-align:top">' + nv + '</td>';
+        if (!ks.length) h += '<tr>' + name + '<td colspan="6" class="muted">No orders in this period</td></tr>';
+        ks.forEach(function (c, i) { h += '<tr>' + (i ? '' : name) + '<td>' + esc(c) + '</td>' + soldCells(box[c]) + '</tr>'; });
+      });
+      h += '</tbody></table></div></section>';
+    }
+    return h;
+  }
+
+  /* ---------- orders, billing queue, approvals ---------- */
+  function viewOrders() {
+    var sales = role() === 'sales';
+    return '<div class="head"><div><h2>' + (sales ? 'My orders' : 'All orders') + '</h2><p class="sub">' + (sales ? 'See whether each order is billed, sent for approval or rejected, and why.' : 'Select an order to see its items and billing.') + '</p></div>' + filterBar({ status: true, search: true }) + '</div><section class="panel" id="ordersBody">' + ordersTable(visibleOrders({ status: true, search: true }), 'No orders match these filters.') + '</section>';
+  }
+  function renderOrdersBody() { var el = document.getElementById('ordersBody'); if (el) el.innerHTML = ordersTable(visibleOrders({ status: true, search: true }), 'No orders match these filters.'); }
+  function oldestFirst(a, b) { return (a.date || '').localeCompare(b.date || '') || (a.no || '').localeCompare(b.no || ''); }
+  function viewToBill() {
+    var all = list('salesorders').sort(oldestFirst), pick = function (ss) { return all.filter(function (o) { return ss.indexOf(statusOf(o)) >= 0; }); };
+    var ready = pick(['pending', 'approved']), wait = pick(['approval']), part = pick(['part']);
+    var h = '<div class="head"><div><h2>Orders to bill</h2><p class="sub">Oldest first. Open an order to confirm it as billed, send it to the admin for approval, or reject it.</p></div></div>';
+    h += '<section class="panel"><h3>Ready to bill (' + ready.length + ')</h3>' + ordersTable(ready, 'Nothing is waiting to be billed.') + '</section>';
+    h += '<section class="panel"><h3>Waiting for admin approval (' + wait.length + ')</h3><p class="sub">These cannot be billed until the admin approves.</p>' + ordersTable(wait, 'No orders are waiting for approval.') + '</section>';
+    h += '<section class="panel"><h3>Part billed (' + part.length + ')</h3>' + ordersTable(part, 'No part billed orders.') + '</section>';
+    return h;
+  }
+  function viewApprovals() {
+    var all = list('salesorders'), wait = all.filter(function (o) { return statusOf(o) === 'approval'; }).sort(oldestFirst);
+    var done = all.filter(function (o) { return o.decidedAt; }).sort(function (a, b) { return String(b.decidedAt).localeCompare(String(a.decidedAt)); }).slice(0, 15);
+    var h = '<div class="head"><div><h2>Bill approvals</h2><p class="sub">Orders the billing person sent to you. Billing stays locked until you approve.</p></div></div>';
+    h += '<section class="panel"><h3>Waiting for your decision (' + wait.length + ')</h3>' + ordersTable(wait, 'Nothing is waiting for approval.') + '</section>';
+    h += '<section class="panel"><h3>Recently decided</h3>' + ordersTable(done, 'No approvals decided yet.') + '</section>';
+    return h;
+  }
+
+  /* ---------- visits ---------- */
+  function visitsTable(vs, emptyMsg) {
+    var h = '<div class="scroll"><table><thead><tr><th>Date</th><th>Time</th><th>Salesperson</th><th>Customer</th><th>Result</th><th>Reason if no order</th><th>Visit note</th></tr></thead><tbody>';
+    if (!vs.length) h += '<tr><td colspan="7" class="empty">' + emptyMsg + '</td></tr>';
+    vs.forEach(function (v) {
+      var o = v.orderId && S.salesorders[v.orderId];
+      h += '<tr' + (o ? ' class="click" tabindex="0" data-act="open" data-id="' + esc(v.orderId) + '"' : '') + '><td>' + dmy(v.date) + '</td><td class="ono">' + esc(v.time || '') + '</td><td>' + esc(userName(v.spId)) + '</td><td>' + esc(v.customerName) + '</td><td>' + (v.outcome === 'order' ? '<span class="pill order"><i></i>Order ' + esc(o ? o.no : 'placed') + '</span>' : '<span class="pill noorder"><i></i>No order</span>') + '</td><td>' + esc(v.outcome === 'order' ? '' : (v.reason || '') + (v.reasonOther ? ': ' + v.reasonOther : '')) + '</td><td class="why">' + esc(v.note || '') + '</td></tr>';
+    });
+    return h + '</tbody></table></div>';
+  }
+  function viewVisits() {
+    var sales = role() === 'sales', vs = visibleVisits(), counts = {};
+    vs.forEach(function (v) { if (v.outcome !== 'order') counts[v.reason || 'Other'] = (counts[v.reason || 'Other'] || 0) + 1; });
+    var h = '<div class="head"><div><h2>' + (sales ? 'My visits' : 'Customer visits') + '</h2><p class="sub">' + vs.length + ' visits, ' + vs.filter(function (v) { return v.outcome === 'order'; }).length + ' with an order, ' + periodText() + '.</p></div>' + filterBar() + '</div>';
+    h += '<section class="panel">';
+    var ks = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a]; });
+    if (ks.length) h += '<h3>Why customers did not order</h3><div class="chips">' + ks.map(function (k) { return '<span class="chip">' + esc(k) + '<b>' + counts[k] + '</b></span>'; }).join('') + '</div>';
+    return h + visitsTable(vs, 'No visits in this period.') + '</section>';
+  }
+  function lineRow(isNew) {
+    if (isNew) return '<tr data-new="1"><td><input class="w-item" data-f="item" aria-label="New item name" placeholder="New item name"></td><td><input class="w-s" type="number" min="0" step="any" data-f="qty" aria-label="Quantity"></td><td><select class="w-s" data-f="unit" aria-label="Litres or nos"><option value="L">Litres</option><option value="Nos">Nos</option></select></td><td><input class="w-s" type="number" min="0" step="any" data-f="per" aria-label="Litres or nos in one quantity" placeholder="per 1 qty"></td><td class="num" data-f="conv">0</td><td><button class="btn small" type="button" data-act="delLine">Remove</button></td></tr>';
+    return '<tr><td><input class="w-item" list="itemList" data-f="item" aria-label="Stock item" placeholder="Search stock item"></td><td><input class="w-s" type="number" min="0" step="any" data-f="qty" aria-label="Quantity"></td><td class="muted" data-f="unitTxt">–</td><td class="num muted" data-f="perTxt">–</td><td class="num" data-f="conv">0</td><td><button class="btn small" type="button" data-act="delLine">Remove</button></td></tr>';
+  }
+  function viewNewVisit() {
+    var h = '<div class="head"><div><h2>New customer visit</h2><p class="sub">Record each visit. If the customer orders, add the items and the order goes to billing.</p></div></div>';
+    if (!activeCustomers().length) return h + '<section class="panel"><div class="empty">The admin has not added any customers yet.</div></section>';
+    h += '<section class="panel"><div class="form"><div class="grid3">';
+    h += '<label class="f" for="vDate">Visit date<input type="date" id="vDate" value="' + today() + '"></label>';
+    h += '<label class="f" for="vTime">Time<input type="time" id="vTime" value="' + nowTime() + '"></label>';
+    h += '<label class="f" for="vCust">Customer<input id="vCust" list="custList" placeholder="Search customer"></label></div>';
+    h += '<label class="f" for="vNote">Visit note<input id="vNote" placeholder="What was discussed"></label>';
+    h += '<div><div class="muted" style="margin-bottom:6px">Did the customer give an order?</div><div class="choices" role="radiogroup" aria-label="Order given"><label for="vYes"><input type="radio" name="vOut" id="vYes" value="order">Yes, place order</label><label for="vNo"><input type="radio" name="vOut" id="vNo" value="no_order">No order</label></div></div>';
+    h += '<div class="box" id="noBox" hidden><strong>Reason for no order</strong><div class="grid3"><label class="f" for="vReason">Reason<select id="vReason"><option value="">Choose a reason</option>' + REASONS.map(function (r) { return '<option>' + esc(r) + '</option>'; }).join('') + '</select></label><label class="f" for="vOther" id="otherWrap" hidden>Write the reason<input id="vOther"></label></div></div>';
+    h += '<div class="box" id="ordBox" hidden><strong>Order items</strong><div class="scroll"><table class="lines"><thead><tr><th>Stock item</th><th class="num">Quantity</th><th>Litres or nos</th><th class="num">In one quantity</th><th class="num">Total</th><th></th></tr></thead><tbody id="oLines">' + lineRow(false) + '</tbody></table></div>';
+    h += '<div class="btns"><button class="btn" type="button" data-act="addLine">Add stock item</button><button class="btn" type="button" data-act="addNewLine">Add new item not in the list</button><span class="total" id="oTotal"></span></div>';
+    h += '<label class="f" for="oDesc">Order description<textarea id="oDesc" placeholder="Delivery instructions, scheme, anything billing should know"></textarea></label></div>';
+    h += '<div class="row-end"><span class="err" id="vErr" role="alert"></span><button class="btn primary" type="button" data-act="saveVisit" id="vSave">Save visit</button></div>';
+    h += '</div></section><datalist id="itemList"></datalist><datalist id="custList"></datalist>';
+    var mine = list('visits').filter(function (v) { return v.spId === UI.uid && v.date === today(); }).sort(function (a, b) { return (b.time || '').localeCompare(a.time || ''); });
+    h += '<section class="panel" id="todayBox"><h3>My visits today (' + mine.length + ')</h3>' + visitsTable(mine, 'No visits recorded today.') + '</section>';
+    return h;
+  }
+  function fillLists() {
+    var il = document.getElementById('itemList'), cl = document.getElementById('custList');
+    if (il) il.innerHTML = activeItems().map(function (i) { return '<option value="' + esc(i.name) + '">' + esc(i.category || '') + '</option>'; }).join('');
+    var kl = document.getElementById('catList'); if (kl) kl.innerHTML = categories().map(function (c) { return '<option value="' + esc(c) + '">'; }).join('');
+    if (cl) cl.innerHTML = activeCustomers().map(function (c) { return '<option value="' + esc(c.name) + '">' + esc(c.area || '') + '</option>'; }).join('');
+  }
+  function findByName(arr, name) { var n = String(name).trim().toLowerCase(); return arr.filter(function (x) { return String(x.name).toLowerCase() === n; })[0]; }
+  function readLines() {
+    return Array.prototype.map.call(document.querySelectorAll('#oLines tr'), function (tr) {
+      var g = function (f) { var el = tr.querySelector('[data-f="' + f + '"]'); return el ? el.value : ''; };
+      if (tr.dataset.new) return { item: g('item').trim(), itemId: '', unit: g('unit') === 'L' ? 'L' : 'Nos', per: num(g('per')), qty: num(g('qty')), billedQty: 0, isNew: true };
+      var it = findByName(activeItems(), g('item'));
+      return { item: it ? it.name : g('item').trim(), itemId: it ? it.id : '', unit: it ? (it.unit === 'L' ? 'L' : 'Nos') : '', per: it ? num(it.per) || 1 : 0, category: it ? it.category || '' : '', qty: num(g('qty')), billedQty: 0, unknown: !it };
+    });
+  }
+  function recalcVisit() {
+    var out = (document.querySelector('input[name="vOut"]:checked') || {}).value || '';
+    var nb = document.getElementById('noBox'), ob = document.getElementById('ordBox'); if (!nb) return;
+    nb.hidden = out !== 'no_order'; ob.hidden = out !== 'order';
+    document.getElementById('otherWrap').hidden = document.getElementById('vReason').value !== 'Other';
+    document.getElementById('vSave').textContent = out === 'order' ? 'Save visit and place order' : 'Save visit';
+    var t = { L: 0, N: 0 }, ls = readLines();
+    Array.prototype.forEach.call(document.querySelectorAll('#oLines tr'), function (tr, i) {
+      var l = ls[i], v = l.unit ? inUnit(l, l.qty) : 0;
+      if (!tr.dataset.new) { tr.querySelector('[data-f="unitTxt"]').textContent = l.unit ? (l.unit === 'L' ? 'Litres' : 'Nos') + (l.category ? ' · ' + l.category : '') : '–'; tr.querySelector('[data-f="perTxt"]').textContent = l.unit ? qty(l.per) + ' ' + l.unit : '–'; }
+      tr.querySelector('[data-f="conv"]').textContent = l.unit && l.per ? qty(v) + ' ' + l.unit : '0';
+      if (l.unit && l.per) t[l.unit === 'L' ? 'L' : 'N'] += v;
+    });
+    document.getElementById('oTotal').textContent = 'Order total: ' + fmtT(t);
+  }
+  function saveVisit() {
+    var err = document.getElementById('vErr'), date = document.getElementById('vDate').value, time = document.getElementById('vTime').value;
+    var cust = findByName(activeCustomers(), document.getElementById('vCust').value), out = (document.querySelector('input[name="vOut"]:checked') || {}).value || '';
+    var reason = document.getElementById('vReason').value, other = document.getElementById('vOther').value.trim(), msg = '', ls = [];
+    if (!date || !time) msg = 'Enter the visit date and time.';
+    else if (!cust) msg = 'Choose the customer from the list. If the customer is missing, ask the admin to add it.';
+    else if (!out) msg = 'Choose whether the customer gave an order.';
+    else if (out === 'no_order' && !reason) msg = 'Choose the reason for no order.';
+    else if (out === 'no_order' && reason === 'Other' && !other) msg = 'Write the reason for no order.';
+    else if (out === 'order') {
+      ls = readLines().filter(function (l) { return l.item || l.qty; });
+      if (!ls.length) msg = 'Add at least one item to the order.';
+      ls.forEach(function (l, i) {
+        if (msg) return;
+        if (l.unknown) msg = 'Item ' + (i + 1) + ' is not in the stock list. Pick it from the list, or use Add new item not in the list.';
+        else if (!l.item) msg = 'Item ' + (i + 1) + ' needs a name.';
+        else if (l.qty <= 0) msg = 'Enter a quantity above zero for ' + l.item + '.';
+        else if (l.isNew && l.per <= 0) msg = 'Enter how many litres or nos one quantity of ' + l.item + ' holds.';
+      });
+    }
+    err.textContent = msg; if (msg) return;
+    var btn = document.getElementById('vSave'); btn.disabled = true;
+    var visit = { date: date, time: time, spId: UI.uid, customerId: cust.id, customerName: cust.name, note: document.getElementById('vNote').value.trim(), outcome: out, reason: out === 'no_order' ? reason : '', reasonOther: out === 'no_order' && reason === 'Other' ? other : '', orderId: '' };
+    var first = Promise.resolve('');
+    if (out === 'order') {
+      ls = ls.map(function (l) { delete l.unknown; return l; });
+      first = insert('salesorders', { date: date, time: time, spId: UI.uid, customerId: cust.id, customerName: cust.name, lines: ls, description: document.getElementById('oDesc').value.trim(), status: 'pending' });
+    }
+    first.then(function (oid) {
+      if (oid === null) return null;
+      visit.orderId = oid;
+      return insert('visits', visit);
+    }).then(function (vid) {
+      if (!vid) { btn.disabled = false; return; }
+      var o = visit.orderId && S.salesorders[visit.orderId];
+      toast(o ? 'Visit saved and order ' + o.no + ' sent to billing.' : 'Visit saved.');
+      render(true);
+    });
+  }
+
+  /* ---------- masters ---------- */
+  function onOff(coll, x) { return '<button class="btn small" type="button" data-act="toggle" data-coll="' + coll + '" data-id="' + esc(x.id) + '">' + (x.active === false ? 'Switch on' : 'Switch off') + '</button>'; }
+  function viewItems() {
+    var its = list('stock').sort(byName), asked = {};
+    list('salesorders').forEach(function (o) { lines(o).forEach(function (l) { if (l.isNew && !findByName(its, l.item)) asked[l.item.toLowerCase()] = { l: l, no: o.no, by: userName(o.spId) }; }); });
+    var h = '<div class="head"><div><h2>Stock items</h2><p class="sub">Set what one quantity of each item counts as. Take of Oil 8L is Litres, 8: quantity 1 is reported as 8 L.</p></div></div>';
+    h += '<section class="panel"><h3>Add an item</h3><div class="inline"><label class="f" for="iName" style="flex:3">Item name<input id="iName"></label><label class="f" for="iCat" style="flex:2">Category<input id="iCat" list="catList" placeholder="Lubricants"></label><label class="f" for="iUnit">Counted in<select id="iUnit"><option value="L">Litres</option><option value="Nos">Nos</option></select></label><label class="f" for="iPer">In one quantity<input id="iPer" type="number" min="0" step="any" placeholder="8"></label><button class="btn primary" type="button" data-act="addItem">Add item</button></div>';
+    h += '<details class="bulk"><summary>Add many items at once</summary><p class="sub">One item per line: name, category, L or Nos, litres or nos in one quantity. Example: Take of Oil 8L, Lubricants, L, 8</p><textarea id="iBulk" aria-label="Items, one per line"></textarea><button class="btn" type="button" data-act="bulkItems">Add these items</button></details></section>';
+    var ak = Object.keys(asked);
+    if (ak.length) {
+      h += '<section class="panel"><h3>New items salespeople ordered (' + ak.length + ')</h3><p class="sub">Not in your list yet. Add them so they appear in the search.</p><div class="scroll"><table><tbody>' + ak.map(function (k) { var a = asked[k]; return '<tr><td>' + esc(a.l.item) + '</td><td class="muted">' + qty(a.l.per) + ' ' + unitOf(a.l) + ' in one quantity</td><td class="muted">' + esc(a.no) + ', ' + esc(a.by) + '</td><td style="text-align:right"><button class="btn small" type="button" data-act="adoptItem" data-name="' + esc(a.l.item) + '" data-unit="' + unitOf(a.l) + '" data-per="' + num(a.l.per) + '">Add to stock list</button></td></tr>'; }).join('') + '</tbody></table></div></section>';
+    }
+    h += '<section class="panel"><h3>Item list (' + its.length + ')</h3><div class="scroll"><table><thead><tr><th>Item</th><th>Category</th><th>Counted in</th><th class="num">In one quantity</th><th></th></tr></thead><tbody>';
+    if (!its.length) h += '<tr><td colspan="5" class="empty">No items yet.</td></tr>';
+    its.forEach(function (i) { h += '<tr><td>' + esc(i.name) + (i.active === false ? ' <span class="muted">(off)</span>' : '') + '</td><td>' + (i.category ? esc(i.category) : '<span class="muted">Uncategorised</span>') + '</td><td>' + (i.unit === 'L' ? 'Litres' : 'Nos') + '</td><td class="num">' + qty(num(i.per) || 1) + ' ' + (i.unit === 'L' ? 'L' : 'Nos') + '</td><td style="text-align:right;white-space:nowrap"><button class="btn small" type="button" data-act="editItem" data-id="' + esc(i.id) + '">Edit</button> ' + onOff('stock', i) + '</td></tr>'; });
+    return h + '</tbody></table></div></section><datalist id="catList"></datalist>';
+  }
+  function itemFrom(name, unit, per, cat) { return { name: String(name).trim(), category: String(cat || '').trim(), unit: /^l/i.test(String(unit).trim()) ? 'L' : 'Nos', per: num(per) || 1, active: true }; }
+  function itemForm(id, it) {
+    openForm(id ? 'Edit item' : 'Add to stock list', [{ k: 'name', label: 'Item name', value: it.name }, { k: 'category', label: 'Category', value: it.category || '', options: [['', 'Uncategorised']].concat(categories().map(function (c) { return [c, c]; })) }, { k: 'unit', label: 'Counted in', value: it.unit === 'L' ? 'L' : 'Nos', options: [['L', 'Litres'], ['Nos', 'Nos']] }, { k: 'per', label: 'Litres or nos in one quantity', type: 'number', value: num(it.per) || 1 }], function (f) {
+      if (!f.name) return 'Enter the item name.';
+      var ni = Object.assign({}, id ? it : {}, itemFrom(f.name, f.unit, f.per, f.category), { active: it.active !== false }); delete ni.rate;
+      delete ni.id;
+      (id ? update('stock', id, ni) : insert('stock', ni)).then(function (ok) { if (ok) render(true); });
+    });
+  }
+  function viewCustomers() {
+    var cs = list('customers').sort(byName);
+    var h = '<div class="head"><div><h2>Customers</h2><p class="sub">Salespeople pick the customer they visited from this list.</p></div></div>';
+    h += '<section class="panel"><h3>Add a customer</h3><div class="inline"><label class="f" for="cName" style="flex:3">Customer name<input id="cName"></label><label class="f" for="cArea" style="flex:2">Area or town<input id="cArea"></label><button class="btn primary" type="button" data-act="addCustomer">Add customer</button></div>';
+    h += '<details class="bulk"><summary>Add many customers at once</summary><p class="sub">One customer per line: name, area. Example: Shree Ganesh Auto, Pune</p><textarea id="cBulk" aria-label="Customers, one per line"></textarea><button class="btn" type="button" data-act="bulkCustomers">Add these customers</button></details></section>';
+    h += '<section class="panel"><h3>Customer list (' + cs.length + ')</h3><div class="scroll"><table><thead><tr><th>Customer</th><th>Area</th><th></th></tr></thead><tbody>';
+    if (!cs.length) h += '<tr><td colspan="3" class="empty">No customers yet.</td></tr>';
+    cs.forEach(function (c) { h += '<tr><td>' + esc(c.name) + (c.active === false ? ' <span class="muted">(off)</span>' : '') + '</td><td>' + esc(c.area || '') + '</td><td style="text-align:right;white-space:nowrap"><button class="btn small" type="button" data-act="editCustomer" data-id="' + esc(c.id) + '">Edit</button> ' + onOff('customers', c) + '</td></tr>'; });
+    return h + '</tbody></table></div></section>';
+  }
+  function viewUsers() {
+    var us = list('users').sort(function (a, b) { return a.role.localeCompare(b.role) || byName(a, b); });
+    var h = '<div class="head"><div><h2>Users and logins</h2><p class="sub">Give each salesperson and the billing person a username and password. Switching a login off blocks it at once and keeps the history.</p></div></div>';
+    h += '<section class="panel"><h3>Add a user</h3><div class="inline"><label class="f" for="uName" style="flex:2">Name<input id="uName"></label><label class="f" for="uRole">Type<select id="uRole"><option value="sales">Salesperson</option><option value="billing">Billing</option><option value="admin">Admin</option></select></label><label class="f" for="uUser">Username<input id="uUser" autocapitalize="none" autocomplete="off"></label><label class="f" for="uPin">Password<input id="uPin" type="text" autocomplete="off"></label><button class="btn primary" type="button" data-act="addUser">Add user</button></div><span class="err" id="uErr" role="alert" style="padding:0 14px 10px;display:block"></span></section>';
+    h += '<section class="panel"><h3>User list (' + us.length + ')</h3><div class="scroll"><table><thead><tr><th>Name</th><th>Type</th><th>Username</th><th></th></tr></thead><tbody>';
+    us.forEach(function (u) { h += '<tr><td>' + esc(u.name) + (u.active === false ? ' <span class="muted">(off)</span>' : '') + (u.id === UI.uid ? ' <span class="muted">(you)</span>' : '') + '</td><td>' + ROLE[u.role] + '</td><td class="ono">' + esc(u.username) + '</td><td style="text-align:right;white-space:nowrap"><button class="btn small" type="button" data-act="editUser" data-id="' + esc(u.id) + '">Edit or reset password</button> ' + (u.id === UI.uid ? '' : onOff('users', u)) + '</td></tr>'; });
+    return h + '</tbody></table></div></section>';
+  }
+
+  /* ---------- small edit dialog ---------- */
+  var formSave = null;
+  function openForm(title, fields, onSave) {
+    formSave = onSave; openId = null;
+    var h = '<div class="overlay" id="ov"><div class="dialog narrow" role="dialog" aria-modal="true" aria-labelledby="dTitle"><h3 id="dTitle">' + esc(title) + '</h3>';
+    fields.forEach(function (f) {
+      h += '<label class="f" for="ef-' + f.k + '">' + esc(f.label) + (f.options ? '<select id="ef-' + f.k + '" data-ef="' + f.k + '">' + f.options.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (o[0] === f.value ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select>' : '<input id="ef-' + f.k + '" data-ef="' + f.k + '" type="' + (f.type || 'text') + '"' + (f.type === 'number' ? ' min="0" step="any"' : '') + ' value="' + esc(f.value == null ? '' : f.value) + '">') + '</label>';
+    });
+    h += '<div class="row-end"><span class="err" id="efErr" role="alert"></span><span class="btns"><button class="btn" type="button" id="bClose">Cancel</button><button class="btn primary" type="button" id="efSave">Save</button></span></div></div></div>';
+    overlayHost.innerHTML = h;
+    var first = overlayHost.querySelector('[data-ef]'); if (first) first.focus();
+  }
+
+  /* ---------- order dialog ---------- */
+  var openId = null;
+  function closeDialog() { openId = null; formSave = null; overlayHost.innerHTML = ''; if (deferred) render(true); }
+  function openOrder(id) {
+    var o = S.salesorders[id]; if (!o) return;
+    openId = id; formSave = null;
+    var s = statusOf(o), r = role(), billForm = r === 'billing' && canBillNow(o), fresh = !isBilled(o);
+    var h = '<div class="overlay" id="ov"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dTitle">';
+    h += '<div class="row-end"><h3 id="dTitle">Order ' + esc(o.no) + '</h3>' + pill(s) + '</div>';
+    h += '<div class="meta"><div><span>Order date</span>' + dmy(o.date) + ' ' + esc(o.time || '') + '</div><div><span>Salesperson</span>' + esc(userName(o.spId)) + '</div><div><span>Customer</span>' + esc(o.customerName) + '</div>';
+    if (isBilled(o)) h += '<div><span>Bill number</span>' + esc(o.invoiceNo) + '</div><div><span>Bill date</span>' + dmy(o.billDate) + '</div>';
+    h += '</div>';
+    var trail = '';
+    if (o.description) trail += '<div><span class="muted">Order description:</span> ' + esc(o.description) + '</div>';
+    if (o.reqNote) trail += '<div><span class="muted">Billing asked for approval:</span> ' + esc(o.reqNote) + '</div>';
+    if (o.decidedAt) trail += '<div><span class="muted">Admin ' + (o.decision === 'approved' ? 'approved' : 'rejected') + ':</span> ' + esc(o.decisionNote || 'no note') + '</div>';
+    if (s === 'rejected' && o.rejectedBy !== 'admin') trail += '<div><span class="muted">Billing rejected:</span> ' + esc(o.rejectNote || '') + '</div>';
+    if (o.billNote) trail += '<div><span class="muted">Billing note:</span> ' + esc(o.billNote) + '</div>';
+    if (trail) h += '<div class="trail">' + trail + '</div>';
+    h += '<div class="scroll"><table><thead><tr><th>Item</th><th class="num">Ordered qty</th><th class="num">Ordered</th><th class="num">Billed qty</th><th class="num">Billed</th></tr></thead><tbody>';
+    lines(o).forEach(function (l, i) {
+      var start = fresh ? num(l.qty) : num(l.billedQty);
+      h += '<tr><td>' + esc(l.item) + (l.isNew ? ' <span class="muted">(new item)</span>' : '') + '<div class="muted">' + esc(catOf(l)) + ' · 1 qty = ' + qty(num(l.per) || 1) + ' ' + unitOf(l) + '</div></td><td class="num">' + qty(l.qty) + '</td><td class="num">' + qty(inUnit(l, l.qty)) + ' ' + unitOf(l) + '</td><td class="num">' + (billForm ? '<input type="number" min="0" max="' + num(l.qty) + '" step="any" id="bq' + i + '" data-bq="' + i + '" style="width:96px" aria-label="Billed quantity for ' + esc(l.item) + '" value="' + start + '">' : (isBilled(o) ? qty(l.billedQty) : '<span class="muted">nil</span>')) + '</td><td class="num" data-bv="' + i + '">' + (billForm || isBilled(o) ? qty(inUnit(l, billForm ? start : l.billedQty)) + ' ' + unitOf(l) : '<span class="muted">nil</span>') + '</td></tr>';
+    });
+    h += '</tbody><tfoot><tr><td colspan="2">Total</td><td class="num">' + fmtT(totals(o, 'qty')) + '</td><td></td><td class="num" id="bTot">' + (isBilled(o) ? fmtT(totals(o, 'billedQty')) : '') + '</td></tr></tfoot></table></div>';
+    var btns = '';
+    if (r === 'billing') {
+      if (s === 'approval') h += '<div class="notice">Waiting for the admin to approve. Billing is locked until then.</div>';
+      if (s === 'rejected') h += '<div class="notice">This order is rejected. Only the admin can reopen it.</div>';
+      if (billForm) {
+        h += '<div class="grid3"><label class="f" for="bInv">Bill number<input id="bInv" value="' + esc(o.invoiceNo || '') + '"></label><label class="f" for="bDate">Bill date<input type="date" id="bDate" value="' + esc(o.billDate || today()) + '"></label></div>';
+        h += '<label class="f" for="bNote">Note, or reason when sending for approval or rejecting<textarea id="bNote">' + esc(o.billNote || '') + '</textarea></label>';
+        if (s === 'pending' || s === 'approved') btns += '<button class="btn danger" type="button" id="bReject">Reject order</button>';
+        if (s === 'pending') btns += '<button class="btn" type="button" id="bAsk">Send for approval</button>';
+        btns += '<button class="btn primary" type="button" id="bSave">' + (isBilled(o) ? 'Update billing' : 'Confirm billed') + '</button>';
+      }
+    }
+    if (r === 'admin') {
+      if (s === 'approval') { h += '<label class="f" for="bNote">Your note to billing (needed when rejecting)<textarea id="bNote"></textarea></label>'; btns += '<button class="btn danger" type="button" id="aReject">Reject</button><button class="btn primary" type="button" id="aApprove">Approve for billing</button>'; }
+      if (s === 'rejected') btns += '<button class="btn" type="button" id="aReopen">Reopen for billing</button>';
+      btns = '<button class="btn danger" type="button" id="bDel">Delete order</button>' + btns;
+    }
+    if (r === 'sales' && s === 'pending' && o.spId === UI.uid) btns += '<button class="btn danger" type="button" id="bDel">Cancel order</button>';
+    h += '<div class="row-end"><span class="err" id="bErr" role="alert"></span><span class="btns"><button class="btn" type="button" id="bClose">Close</button>' + btns + '</span></div></div></div>';
+    overlayHost.innerHTML = h;
+    if (billForm) syncBill();
+    var f = document.getElementById('bClose'); if (f) f.focus();
+  }
+  function syncBill() {
+    var o = S.salesorders[openId]; if (!o) return;
+    var t = { L: 0, N: 0 };
+    lines(o).forEach(function (l, i) {
+      var inp = document.getElementById('bq' + i); if (!inp) return;
+      var v = inUnit(l, inp.value); t[unitOf(l) === 'L' ? 'L' : 'N'] += v;
+      overlayHost.querySelector('[data-bv="' + i + '"]').textContent = qty(v) + ' ' + unitOf(l);
+    });
+    document.getElementById('bTot').textContent = fmtT(t);
+  }
+  function noteVal() { var el = document.getElementById('bNote'); return el ? el.value.trim() : ''; }
+  function commit(o, fields, msg) { var id = openId; closeDialog(); update('salesorders', id, fields).then(function (ok) { if (ok) toast(msg); render(true); }); }
+  overlayHost.addEventListener('input', function (e) {
+    if (e.target.dataset && e.target.dataset.bq != null) syncBill();
+  });
+  overlayHost.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeDialog(); });
+  overlayHost.addEventListener('click', function (e) {
+    var id = e.target.id, stamp = new Date().toISOString(), err = document.getElementById('bErr');
+    if (id === 'ov' || id === 'bClose') return closeDialog();
+    if (id === 'efSave' && formSave) {
+      var vals = {}; Array.prototype.forEach.call(overlayHost.querySelectorAll('[data-ef]'), function (el) { vals[el.dataset.ef] = el.value.trim(); });
+      var m = formSave(vals); if (m) { document.getElementById('efErr').textContent = m; return; }
+      return closeDialog();
+    }
+    var o = S.salesorders[openId]; if (!o) return;
+    var s = statusOf(o), r = role();
+    if (id === 'bDel') {
+      if (!e.target.dataset.sure) { e.target.dataset.sure = '1'; e.target.textContent = 'Click again to confirm'; return; }
+      var gone = openId; closeDialog();
+      remove('salesorders', gone).then(function (ok) { if (ok) toast('Order ' + o.no + ' removed.'); render(true); });
+    }
+    if (id === 'bSave' && r === 'billing') {
+      var res = buildBilling(o, { billedQtys: lines(o).map(function (l, i) { return document.getElementById('bq' + i).value; }), invoiceNo: document.getElementById('bInv').value, billDate: document.getElementById('bDate').value, note: noteVal() });
+      if (res.error) { err.textContent = res.error; return; }
+      commit(o, Object.assign(res.fields, { billedBy: UI.uid, billedAt: stamp }), 'Order ' + o.no + ' confirmed as ' + STATUS[res.fields.status].toLowerCase() + '.');
+    }
+    if (id === 'bAsk' && r === 'billing' && s === 'pending') {
+      if (!noteVal()) { err.textContent = 'Write why this bill needs the admin’s approval.'; return; }
+      commit(o, { status: 'approval', reqNote: noteVal(), reqBy: UI.uid, reqAt: stamp }, 'Order ' + o.no + ' sent to the admin for approval.');
+    }
+    if (id === 'bReject' && r === 'billing' && (s === 'pending' || s === 'approved')) {
+      if (!noteVal()) { err.textContent = 'Write the reason for rejecting this order.'; return; }
+      commit(o, { status: 'rejected', rejectNote: noteVal(), rejectedBy: 'billing', rejectedAt: stamp }, 'Order ' + o.no + ' rejected.');
+    }
+    if (id === 'aApprove' && r === 'admin' && s === 'approval') commit(o, { status: 'approved', decision: 'approved', decisionNote: noteVal(), decidedAt: stamp }, 'Order ' + o.no + ' approved for billing.');
+    if (id === 'aReject' && r === 'admin' && s === 'approval') {
+      if (!noteVal()) { err.textContent = 'Write the reason for rejecting, so billing and the salesperson can see it.'; return; }
+      commit(o, { status: 'rejected', decision: 'rejected', decisionNote: noteVal(), rejectNote: noteVal(), rejectedBy: 'admin', decidedAt: stamp, rejectedAt: stamp }, 'Order ' + o.no + ' rejected.');
+    }
+    if (id === 'aReopen' && r === 'admin' && s === 'rejected') commit(o, { status: 'pending', rejectNote: '', rejectedBy: '' }, 'Order ' + o.no + ' reopened for billing.');
+  });
+
+  /* ---------- events on the page ---------- */
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-act]'); if (!t || overlayHost.contains(t)) return;
+    var a = t.dataset.act, id = t.dataset.id, v = function (i) { return document.getElementById(i).value.trim(); };
+    if (a === 'signIn') signIn();
+    else if (a === 'createAdmin') createAdmin();
+    else if (a === 'signOut') setUser('');
+    else if (a === 'refresh') { reload(true).then(function () { render(true); toast('Up to date.'); }); }
+    else if (a === 'open') openOrder(id);
+    else if (a === 'today') { UI.from = UI.to = today(); render(true); reload(false); }
+    else if (a === 'month') { UI.from = monthStart(); UI.to = ''; render(true); reload(false); }
+    else if (a === 'clearFilters') { UI.from = monthStart(); UI.to = UI.sp = UI.status = UI.q = UI.cat = ''; render(true); reload(false); }
+    else if (a === 'addLine' || a === 'addNewLine') { var tb = document.getElementById('oLines'); tb.insertAdjacentHTML('beforeend', lineRow(a === 'addNewLine')); tb.lastElementChild.querySelector('input').focus(); }
+    else if (a === 'delLine') { t.closest('tr').remove(); recalcVisit(); }
+    else if (a === 'saveVisit') saveVisit();
+    else if (a === 'toggle') { var x = S[t.dataset.coll][id]; if (x) update(t.dataset.coll, id, { active: x.active === false }).then(function () { render(true); }); }
+    else if (a === 'addItem') { if (!v('iName')) return document.getElementById('iName').focus(); insert('stock', itemFrom(v('iName'), v('iUnit'), v('iPer'), v('iCat'))).then(function (ok) { if (ok) render(true); }); }
+    else if (a === 'adoptItem' || a === 'editItem') itemForm(a === 'editItem' ? id : '', a === 'editItem' ? S.stock[id] : { name: t.dataset.name, unit: t.dataset.unit, per: t.dataset.per, category: '' });
+    else if (a === 'bulkItems') { var docs = v('iBulk').split('\n').map(function (ln) { var p = ln.split(','); return p[0] && p[0].trim() ? itemFrom(p[0], p[2] || 'Nos', p[3], p[1]) : null; }).filter(Boolean); if (docs.length) insertMany('stock', docs).then(function (n) { if (n) { toast(n + ' items added.'); render(true); } }); }
+    else if (a === 'addCustomer') { if (!v('cName')) return document.getElementById('cName').focus(); insert('customers', { name: v('cName'), area: v('cArea'), active: true }).then(function (ok) { if (ok) render(true); }); }
+    else if (a === 'bulkCustomers') { var cd = v('cBulk').split('\n').map(function (ln) { var p = ln.split(','); return p[0] && p[0].trim() ? { name: p[0].trim(), area: (p[1] || '').trim(), active: true } : null; }).filter(Boolean); if (cd.length) insertMany('customers', cd).then(function (n) { if (n) { toast(n + ' customers added.'); render(true); } }); }
+    else if (a === 'editCustomer') { var c = S.customers[id]; openForm('Edit customer', [{ k: 'name', label: 'Customer name', value: c.name }, { k: 'area', label: 'Area or town', value: c.area || '' }], function (f) { if (!f.name) return 'Enter the customer name.'; update('customers', id, { name: f.name, area: f.area }).then(function (ok) { if (ok) render(true); }); }); }
+    else if (a === 'addUser') {
+      var d = { name: v('uName'), role: v('uRole'), username: v('uUser').toLowerCase(), password: document.getElementById('uPin').value }, ue = document.getElementById('uErr');
+      if (!d.name || !d.username || d.password.length < 6) { ue.textContent = 'Enter a name, a username and a password of at least 6 characters.'; return; }
+      ue.textContent = ''; t.disabled = true;
+      server('POST', 'users', d).then(function (u) { S.users[u.id] = { name: u.name, username: u.username, role: u.role, active: true }; toast('Login created for ' + u.name + '.'); render(true); }, function (e) { t.disabled = false; ue.textContent = (e && e.message) || 'Could not add the user. Try again.'; });
+    }
+    else if (a === 'editUser') {
+      var u = S.users[id];
+      openForm('Edit ' + u.name, [{ k: 'name', label: 'Name', value: u.name }, { k: 'username', label: 'Username', value: u.username }, { k: 'password', label: 'New password (leave empty to keep)', value: '' }], function (f) {
+        if (!f.name || !f.username) return 'Enter the name and username.';
+        if (f.password && f.password.length < 6) return 'Password must be at least 6 characters.';
+        var b = { id: id, name: f.name, username: f.username.toLowerCase() }; if (f.password) b.password = f.password;
+        server('PATCH', 'users', b).then(function (r) { S.users[id] = Object.assign({}, S.users[id], { name: r.name, username: r.username }); toast('Saved.'); render(true); }, function (e) { toast((e && e.message) || 'Could not save the user.'); });
+      });
+    }
+  });
+  main.addEventListener('change', function (e) {
+    var id = e.target.id, map = { fFrom: 'from', fTo: 'to', fSp: 'sp', fSt: 'status', fCat: 'cat' };
+    if (map[id]) { UI[map[id]] = e.target.value; render(true); if (id === 'fFrom' || id === 'fTo') reload(false).then(function () { render(true); }); }
+    else if (e.target.name === 'vOut' || id === 'vReason' || (e.target.dataset && e.target.dataset.f)) recalcVisit();
+  });
+  main.addEventListener('input', function (e) {
+    if (e.target.id === 'fQ') { UI.q = e.target.value; renderOrdersBody(); }
+    else if (e.target.dataset && e.target.dataset.f) recalcVisit();
+  });
+  main.addEventListener('keydown', function (e) {
+    var tr = e.target.closest && e.target.closest('tr.click');
+    if (tr && e.target === tr && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openOrder(tr.dataset.id); }
+    if (e.key === 'Enter' && (e.target.id === 'lPin' || e.target.id === 'lUser')) { var b = main.querySelector('[data-act="signIn"],[data-act="createAdmin"]'); if (b) b.click(); }
+  });
+
+  /* ---------- render ---------- */
+  var deferred = false, lastView = '', painted = false;
+  function render(force) {
+    if (!S.ready) { renderChrome(); painted = false; main.innerHTML = '<div class="empty">Loading…</div>'; return; }
+    if (S.fatal) { renderChrome(); painted = false; main.innerHTML = '<div class="notice">' + esc(S.fatal) + '</div>'; return; }
+    if (UI.uid && !me() && S.stale) { renderChrome(); painted = false; main.innerHTML = '<div class="notice">The database cannot be reached right now. Check your connection.</div><div><button class="btn primary" type="button" data-act="refresh">Try again</button></div>'; return; }
+    if (UI.uid && !me()) { toast('This login is switched off or was removed. Ask the admin.'); return setUser(''); }
+    renderChrome();
+    var key = me() ? UI.view : 'login';
+    var ae = document.activeElement, typing = ae && main.contains(ae) && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName);
+    if (!force && painted && lastView === key && (typing || key === 'new-visit')) { deferred = true; fillLists(); return; }
+    deferred = false; lastView = key;
+    var v = UI.view, body;
+    if (!me()) body = viewLogin();
+    else if (v === 'orders') body = viewOrders();
+    else if (v === 'to-bill') body = viewToBill();
+    else if (v === 'approvals') body = viewApprovals();
+    else if (v === 'new-visit') body = viewNewVisit();
+    else if (v === 'my-visits' || v === 'visits') body = viewVisits();
+    else if (v === 'items') body = viewItems();
+    else if (v === 'customers') body = viewCustomers();
+    else if (v === 'users') body = viewUsers();
+    else body = viewDashboard();
+    main.innerHTML = notices() + body; painted = true;
+    fillLists(); recalcVisit();
+  }
+  main.addEventListener('focusout', function () { if (deferred && lastView !== 'new-visit') setTimeout(function () { if (deferred) render(false); }, 0); });
+
+  var h0 = (location.hash || '').slice(1); if (h0) UI.view = h0;
+  boot();
+})();
+</script>
+</body>
+</html>
